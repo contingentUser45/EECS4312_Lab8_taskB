@@ -84,3 +84,83 @@ def test_capacity_zero_all_waitlisted_and_promotion_never_happens():
 #################################################################################
 # Add your own additional tests here to cover more cases and edge cases as needed.
 #################################################################################
+
+def test_ac1_single_registration_added_to_registered():
+    # AC1: capacity 5, Alpha registers → registered list size becomes 1
+    er = EventRegistration(capacity=5)
+
+    status = er.register("Alpha")
+
+    assert status == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Alpha"]
+    assert snap["waitlist"] == []
+
+
+def test_ac2_registration_goes_to_waitlist_when_capacity_full():
+    # AC2: capacity full → new user added to waitlist
+    er = EventRegistration(capacity=3)
+
+    er.register("Alpha")
+    er.register("Bravo")
+    er.register("Charlie")
+
+    status = er.register("Delta")
+
+    assert status == UserStatus("waitlisted", 1)
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Alpha", "Bravo", "Charlie"]
+    assert snap["waitlist"] == ["Delta"]
+
+
+def test_ac3_cancel_promotes_waitlisted_user():
+    # AC3: cancel registered user promotes earliest waitlisted
+    er = EventRegistration(capacity=2)
+
+    er.register("Alpha")
+    er.register("Bravo")
+    er.register("Charlie")  # waitlisted
+
+    er.cancel("Alpha")
+
+    assert er.status("Charlie") == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Bravo", "Charlie"]
+    assert snap["waitlist"] == []
+
+
+def test_ac5_status_reports_correct_waitlist_position():
+    # AC5: status returns correct waitlist position
+    er = EventRegistration(capacity=1)
+
+    er.register("Alpha")
+    er.register("Bravo")
+    er.register("Echo")
+
+    status = er.status("Echo")
+
+    assert status == UserStatus("waitlisted", 2)
+
+def test_reregister_after_cancel_allowed():
+    er = EventRegistration(capacity=1)
+
+    er.register("Alpha")
+    er.cancel("Alpha")
+
+    status = er.register("Alpha")
+
+    assert status == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Alpha"]
+    assert snap["waitlist"] == []
+
+def test_status_unknown_user_returns_none():
+    er = EventRegistration(capacity=2)
+
+    status = er.status("Ghost")
+
+    assert status == UserStatus("none")

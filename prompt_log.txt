@@ -1,6 +1,1574 @@
-## Student Name:
-## Student ID: 
+## Student Name: Cyrus Yang
+## Student ID: 219583038
 
-Prompt #1: {}
-Response #1: {}
+Prompt #1: {The problem summary: The system's goal is to manage event registrations for a single event with fixed capacity and to handle waitlists in FIFO order. It also promotes users on cancellations, prevents duplicates, allows status queries and maintains consistent state across actions and edge cases.
+The functional requirements: Accept a fixed capacity for the event
+Register users until the capacity is reached
+Place additional users into a FIFO waitlist when capacity is full
+Prevent duplicate registrations for the same user
+Allow users to query their current status
+Ensure the number of registered users never exceeds the fixed capacity
+Preserve FIFO ordering in the waitlist
+Ensure a user does not appear more than once in the system
+Ensure a user does not simultaneously exist in multiple conflicting states
+Allow users to reregister after canceling, subject to availability
+Handle waitlisted users canceling before being promoted
+Handle capacity when there are no registration
+Handle simultaneous or rapid consecutive operations without inconsistency
+Output the updated registration state and ordered lists of registered and waitlisted users after each operation
+The acceptance criteria:AC1:
+
+Given the system is initialized with capacity 5 and no users registered
+When a valid user "Alpha" registers
+Then "Alpha" is added to the registered list and total registered = 1
+Linked Constraint ID(s): C1, C3
+
+AC2:
+
+Given capacity = 3 with 3 users already registered
+When a new user "Delta" registers
+Then "Delta" is added to the end of the waitlist (registered count remains 3)
+Linked Constraint ID(s): C1, C2
+
+AC3:
+
+Given capacity = 2 with "Alpha", "Bravo" registered and "Charlie" waitlisted
+When "Alpha" cancels
+Then "Charlie" is automatically promoted to registered and waitlist becomes empty
+Linked Constraint ID(s): C7, C2, C5
+
+AC4:
+
+Given user "Bravo" is already registered
+When "Bravo" attempts to register again
+Then registration is rejected and system state remains unchanged
+Linked Constraint ID(s): C3, C5
+
+AC5:
+
+Given user "Echo" is the 2nd user in the waitlist
+When get_status("Echo") is called
+Then status returns "waitlisted (position: 2)"
+Linked Constraint ID(s): C4, C5
+
+AC6:
+
+Given capacity = 0
+When any user "Foxtrot" registers
+Then "Foxtrot" is placed directly on the waitlist and registered list stays empty
+Linked Constraint ID(s): C1, C6
+
+
+please note these details}
+Response #1: {Noted. I’ll treat the following as the **formal specification** for the event-registration system. I’ve organized the key points so they are easier to reference when implementing or testing.
+
+---
+
+# Event Registration System Specification
+
+## 1. Problem Summary
+
+The system manages registrations for **one event with a fixed capacity**.
+If the capacity is full, additional users are placed in a **FIFO waitlist**.
+
+The system must:
+
+* Maintain consistent registration state
+* Automatically promote waitlisted users when space becomes available
+* Prevent duplicates
+* Allow status queries
+* Correctly handle edge cases such as cancellations and zero capacity
+
+---
+
+# 2. Functional Requirements
+
+### Capacity Management
+
+* The system must accept a **fixed capacity value** for the event.
+* The **registered list size must never exceed capacity**.
+* If capacity is full, new users are **placed into a FIFO waitlist**.
+
+### Registration Rules
+
+* A user **cannot register more than once**.
+* A user **cannot appear in both registered and waitlisted states**.
+* Users **may re-register after cancelling** if space exists.
+
+### Waitlist Behavior
+
+* Waitlist must maintain **strict FIFO ordering**.
+* If a registered user cancels:
+
+  * The **first user in the waitlist is automatically promoted**.
+* Waitlisted users can **cancel before promotion**.
+
+### Status Query
+
+Users can query their status:
+
+Possible responses:
+
+* `registered`
+* `waitlisted (position: N)`
+* `not registered`
+
+### System State Integrity
+
+The system must ensure:
+
+* No duplicate users anywhere in the system
+* No conflicting states
+* Capacity constraints always respected
+* Consistency under rapid or consecutive operations
+
+### Output Requirement
+
+After **every operation**, the system must output:
+
+* Updated registration state
+* Ordered list of registered users
+* Ordered waitlist
+
+---
+
+# 3. Key Constraints (Implied IDs)
+
+| Constraint ID | Description                                       |
+| ------------- | ------------------------------------------------- |
+| **C1**        | Registered users ≤ capacity                       |
+| **C2**        | Waitlist follows FIFO ordering                    |
+| **C3**        | Duplicate registrations are prevented             |
+| **C4**        | Status queries return correct state               |
+| **C5**        | System state remains consistent                   |
+| **C6**        | Capacity = 0 handled correctly                    |
+| **C7**        | Automatic promotion from waitlist on cancellation |
+
+---
+
+# 4. Acceptance Criteria
+
+## AC1 — Normal Registration
+
+**Given**
+
+* Capacity = 5
+* No users registered
+
+**When**
+
+* `"Alpha"` registers
+
+**Then**
+
+* `"Alpha"` is added to the registered list
+* Total registered = **1**
+
+Linked Constraints: **C1, C3**
+
+---
+
+## AC2 — Waitlist Entry
+
+**Given**
+
+* Capacity = 3
+* 3 users already registered
+
+**When**
+
+* `"Delta"` registers
+
+**Then**
+
+* `"Delta"` is added to the **end of the waitlist**
+* Registered count remains **3**
+
+Linked Constraints: **C1, C2**
+
+---
+
+## AC3 — Promotion After Cancellation
+
+**Given**
+
+* Capacity = 2
+* `"Alpha"` and `"Bravo"` registered
+* `"Charlie"` waitlisted
+
+**When**
+
+* `"Alpha"` cancels
+
+**Then**
+
+* `"Charlie"` is **automatically promoted**
+* Waitlist becomes **empty**
+
+Linked Constraints: **C7, C2, C5**
+
+---
+
+## AC4 — Duplicate Registration
+
+**Given**
+
+* `"Bravo"` is already registered
+
+**When**
+
+* `"Bravo"` attempts to register again
+
+**Then**
+
+* Registration is **rejected**
+* System state **remains unchanged**
+
+Linked Constraints: **C3, C5**
+
+---
+
+## AC5 — Status Query
+
+**Given**
+
+* `"Echo"` is **2nd** in the waitlist
+
+**When**
+
+* `get_status("Echo")` is called
+
+**Then**
+
+* Return:
+  `"waitlisted (position: 2)"`
+
+Linked Constraints: **C4, C5**
+
+---
+
+## AC6 — Zero Capacity
+
+**Given**
+
+* Capacity = **0**
+
+**When**
+
+* `"Foxtrot"` registers
+
+**Then**
+
+* `"Foxtrot"` is placed **directly in the waitlist**
+* Registered list stays **empty**
+
+Linked Constraints: **C1, C6**
+
+---
+
+If you want, I can also provide:
+
+* **A clean state-machine diagram** for this system
+* **A full pseudocode or Java/Python implementation**
+* **Unit tests derived directly from the acceptance criteria** (useful if this is for a software engineering assignment).
+}
+
+Prompt #2: {are there any any ambiguities or missing
+clarifications exist}
+Response #2: {Yes. The specification is fairly solid, but there are **several ambiguities and missing clarifications** that would normally be flagged during requirements analysis. These do not break the system conceptually, but they **leave room for multiple implementations**, which can cause inconsistencies.
+
+Below is a structured review.
+
+---
+
+# 1. Ambiguities
+
+## 1.1 What constitutes a "valid user"
+
+AC1 states:
+
+> When a **valid user** "Alpha" registers
+
+However, **valid user is never defined**.
+
+Unclear points:
+
+* Is a user identified by **unique username**?
+* Are usernames **case-sensitive**? (`alpha` vs `Alpha`)
+* Are special characters allowed?
+
+Example ambiguity:
+
+```
+register("Alpha")
+register("alpha")
+```
+
+Possible interpretations:
+
+* Treated as different users
+* Treated as duplicate
+
+---
+
+# 1.2 Status for users not in the system
+
+AC5 only defines status output for **waitlisted users**.
+
+Missing definition for:
+
+```
+get_status("UnknownUser")
+```
+
+Possible outputs:
+
+* `"not registered"`
+* `"user not found"`
+* `"none"`
+
+This should be explicitly defined.
+
+---
+
+## 1.3 What happens when a waitlisted user tries to register again
+
+The requirements say:
+
+> Prevent duplicate registrations
+
+But they **do not explicitly clarify behavior when the user is already waitlisted**.
+
+Example:
+
+```
+register("Charlie")
+(waitlisted)
+
+register("Charlie") again
+```
+
+Possible interpretations:
+
+1. Reject request
+2. Move them to end of waitlist
+3. Ignore silently
+
+The intended answer is likely **reject**, but it should be explicit.
+
+---
+
+## 1.4 Cancellation behavior for users not in the system
+
+Cancellation rules are not defined for:
+
+```
+cancel("GhostUser")
+```
+
+Possible outcomes:
+
+* Return error
+* Ignore operation
+* Return status message
+
+This should be specified.
+
+---
+
+## 1.5 Order guarantees under "simultaneous operations"
+
+The requirement states:
+
+> Handle simultaneous or rapid consecutive operations without inconsistency
+
+But it does **not define concurrency behavior**.
+
+Unclear points:
+
+* Are operations processed **sequentially**?
+* Is there **thread safety**?
+* What if two users register at the same moment when **one spot remains**?
+
+Example race condition:
+
+```
+capacity = 1
+
+register("Alpha")
+register("Bravo")  ← simultaneous
+```
+
+Who gets the spot?
+
+Possible implementations:
+
+* first processed request
+* timestamp order
+* nondeterministic
+
+---
+
+# 2. Missing Clarifications
+
+## 2.1 Operation return values
+
+The spec requires output after each operation but **does not define the format**.
+
+Example:
+
+```
+register("Alpha")
+```
+
+Expected output could be:
+
+Option A
+
+```
+Registered: [Alpha]
+Waitlist: []
+```
+
+Option B
+
+```
+SUCCESS
+Registered: Alpha
+```
+
+Option C
+
+```
+User Alpha registered successfully
+```
+
+This should be standardized.
+
+---
+
+## 2.2 Cancellation of waitlisted users
+
+Requirement says:
+
+> Handle waitlisted users canceling before being promoted
+
+But does not define **behavior after removal**.
+
+Example:
+
+```
+Waitlist: [Charlie, Delta]
+
+cancel("Charlie")
+```
+
+Result should likely be:
+
+```
+Waitlist: [Delta]
+Delta position becomes 1
+```
+
+But this behavior should be explicitly stated.
+
+---
+
+## 2.3 Promotion rules if multiple spots open
+
+Example scenario:
+
+```
+capacity = 3
+registered = [A, B, C]
+waitlist = [D, E, F]
+
+cancel(A)
+cancel(B)
+```
+
+Questions:
+
+* Promote **D then E immediately?**
+* Or promote **one per cancel operation**?
+
+Both are valid interpretations.
+
+---
+
+## 2.4 Maximum waitlist size
+
+Not defined.
+
+Possible models:
+
+* **Unlimited waitlist**
+* **Limited waitlist**
+* **Capacity × N**
+
+The specification does not state this.
+
+---
+
+## 2.5 Re-registration ordering
+
+Requirement says:
+
+> Allow users to reregister after canceling
+
+But ordering behavior is not defined.
+
+Example:
+
+```
+Alpha registered
+Alpha cancels
+Alpha registers again
+```
+
+Possible outcomes:
+
+1. Goes to **end of waitlist**
+2. Goes directly to **registered if space**
+3. Returns to **original position** (unlikely but possible)
+
+---
+
+# 3. Minor Logical Gaps
+
+### 3.1 Output after status query
+
+Requirement says:
+
+> Output the updated registration state after each operation
+
+But a **status query does not change state**.
+
+Should the system still output full lists?
+
+Example:
+
+```
+get_status("Echo")
+```
+
+Should it return:
+
+Option A
+
+```
+waitlisted (position: 2)
+```
+
+or
+
+Option B
+
+```
+waitlisted (position: 2)
+Registered: [...]
+Waitlist: [...]
+```
+
+---
+
+### 3.2 Definition of FIFO when removing items
+
+FIFO is defined for **promotion**, but behavior when **removing from middle of waitlist** is not explicitly stated (though logically shifting occurs).
+
+---
+
+# 4. Summary of Key Clarifications Needed
+
+A complete specification should clarify:
+
+1. **User identity rules**
+
+   * Case sensitivity
+   * Allowed characters
+
+2. **Status response for unknown users**
+
+3. **Duplicate handling for waitlisted users**
+
+4. **Cancellation behavior for non-existent users**
+
+5. **Concurrency model**
+
+6. **Output format for operations**
+
+7. **Promotion behavior when multiple spots open**
+
+8. **Waitlist size limits**
+
+9. **Re-registration behavior**
+
+10. **Response format for status queries**
+
+---
+
+✅ **Overall assessment:**
+The system requirements are **about 80–85% complete**, but a few **behavioral edge cases and interface definitions** are missing. These would normally be clarified during a **requirements refinement or design phase**.
+
+---
+
+If you'd like, I can also show you the **cleaned, fully unambiguous version of this spec** (what a senior engineer would write before implementation).
+}
+
+Prompt #3: {I should note the names used are dummy and not actual people}
+Response #3: {Understood. That clarification helps but it **does not materially change the system requirements**—the names like *Alpha, Bravo, Charlie, Delta, Echo, Foxtrot* are simply **placeholder identifiers** for users in the examples.
+
+However, it does clarify an important design point.
+
+---
+
+# Implication for the Specification
+
+The names should be interpreted as **unique user identifiers**, not real names.
+
+So in the system model:
+
+```
+UserID = string identifier
+```
+
+Examples used in acceptance criteria:
+
+```
+"Alpha"
+"Bravo"
+"Charlie"
+"Delta"
+"Echo"
+"Foxtrot"
+```
+
+These function exactly like:
+
+* usernames
+* account IDs
+* user keys
+
+---
+
+# Recommended Clarification to Add to the Spec
+
+You could add a small statement like:
+
+**User Identifier Definition**
+
+> Users are identified by a unique string identifier (e.g., "Alpha", "Bravo").
+> These identifiers are placeholders used for testing and examples and do not represent real individuals.
+
+---
+
+# Why This Matters
+
+Without this clarification, an implementer might incorrectly assume:
+
+* names could **repeat**
+* names represent **display names rather than IDs**
+* users might have **multiple accounts**
+
+But your intended model is clearly:
+
+```
+One identifier = one user
+```
+
+And the constraint:
+
+```
+A user identifier may appear at most once in the system.
+```
+
+---
+
+# Good News
+
+Your acceptance criteria already **implicitly assume this**, especially:
+
+* **AC4** (duplicate prevention)
+* **C3** (no duplicate registrations)
+* **C5** (consistent state)
+
+So the examples are already consistent with this assumption.
+
+---
+
+✅ **Conclusion:**
+Using dummy identifiers like `"Alpha"` or `"Bravo"` is perfectly appropriate for requirements and acceptance criteria. Just explicitly state they represent **unique user IDs**, not real people.
+
+---
+
+If you want, I can also show you **one hidden edge case your spec still doesn’t cover that professors/interviewers often test for in this exact registration system problem.**
+}
+
+Prompt #4: {with this out of the way here is the code to implement to: ## Student Name:
+## Student ID:
+
+"""
+Task B: Event Registration with Waitlist (Stub)
+In this lab, you will design and implement an Event Registration with Waitlist system using an LLM assistant as your primary programming collaborator.
+You are asked to implement a Python module that manages registration for a single event with a fixed capacity.
+The system must:
+•	Accept a fixed capacity.
+•	Register users until capacity is reached.
+•	Place additional users into a FIFO waitlist.
+•	Automatically promote the earliest waitlisted user when a registered user cancels.
+•	Prevent duplicate registrations.
+•	Allow users to query their current status.
+
+The system must ensure that:
+•	The number of registered users never exceeds capacity.
+•	Waitlist ordering preserves FIFO behavior.
+•	Promotions occur deterministically under identical operation sequences.
+
+The module must preserve the following invariants:
+•	A user may not appear more than once in the system.
+•	A user may not simultaneously exist in multiple states.
+•	The system state must remain consistent after every operation.
+
+The system must correctly handle non-trivial scenarios such as:
+•	Multiple cancellations in sequence.
+•	Users attempting to re-register after canceling.
+•	Waitlisted users canceling before promotion.
+•	Capacity equal to zero.
+•	Simultaneous or rapid consecutive operations.
+•	Queries during state transitions.
+
+The output consists of the updated registration state and ordered lists of registered and waitlisted users after each operation.
+"""
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+
+class DuplicateRequest(Exception):
+    """Raised if a user tries to register but is already registered or waitlisted."""
+    pass
+
+
+class NotFound(Exception):
+    """Raised if a user cannot be found for cancellation (if required by handout)."""
+    pass
+
+
+@dataclass(frozen=True)
+class UserStatus:
+    """
+    state:
+      - "registered"
+      - "waitlisted"
+      - "none"
+    position: 1-based waitlist position if waitlisted; otherwise None
+    """
+    state: str
+    position: Optional[int] = None
+
+
+class EventRegistration:
+    """
+    Students must implement this class per the lab handout.
+    Deterministic ordering is required (e.g., FIFO waitlist, predictable registration order).
+    """
+
+    def __init__(self, capacity: int) -> None:
+        """
+        Args:
+            capacity: maximum number of registered users (>= 0)
+        """
+        # TODO: Initialize internal data structures
+        raise NotImplementedError("EventRegistration.__init__ not implemented yet")
+
+    def register(self, user_id: str) -> UserStatus:
+        """
+        Register a user:
+          - if capacity available -> registered
+          - else -> waitlisted (FIFO)
+
+        Raises:
+            DuplicateRequest if user already exists (registered or waitlisted)
+        """
+        # TODO: Implement per lab handout
+        raise NotImplementedError("register not implemented yet")
+
+    def cancel(self, user_id: str) -> None:
+        """
+        Cancel a user:
+          - if registered -> remove and promote earliest waitlisted user (if any)
+          - if waitlisted -> remove from waitlist
+          - behavior when user not found depends on handout (raise NotFound or ignore)
+
+        Raises:
+            NotFound (if required by handout)
+        """
+        # TODO: Implement per lab handout
+        raise NotImplementedError("cancel not implemented yet")
+
+    def status(self, user_id: str) -> UserStatus:
+        """
+        Return status of a user:
+          - registered
+          - waitlisted with position (1-based)
+          - none
+        """
+        # TODO: Implement per lab handout
+        raise NotImplementedError("status not implemented yet")
+
+    def snapshot(self) -> dict:
+        """
+        (Optional helper for debugging/tests)
+        Return a deterministic snapshot of internal state.
+        """
+        # TODO: Implement if required/allowed
+        raise NotImplementedError("snapshot not implemented yet")}
+Response #4: {Below is a **clean, deterministic implementation** that satisfies the specification, invariants, and acceptance criteria you described. It uses:
+
+* **`list` for registered users** (order preserved)
+* **`deque` for the waitlist** (efficient FIFO operations)
+* **`set` for fast duplicate detection**
+
+All invariants are enforced:
+
+* No duplicates
+* No user in multiple states
+* Registered ≤ capacity
+* FIFO waitlist
+* Deterministic promotion
+
+---
+
+# Complete Implementation
+
+```python
+from dataclasses import dataclass
+from typing import List, Optional
+from collections import deque
+
+
+class DuplicateRequest(Exception):
+    """Raised if a user tries to register but is already registered or waitlisted."""
+    pass
+
+
+class NotFound(Exception):
+    """Raised if a user cannot be found for cancellation."""
+    pass
+
+
+@dataclass(frozen=True)
+class UserStatus:
+    state: str
+    position: Optional[int] = None
+
+
+class EventRegistration:
+
+    def __init__(self, capacity: int) -> None:
+        if capacity < 0:
+            raise ValueError("capacity must be >= 0")
+
+        self.capacity = capacity
+        self.registered: List[str] = []
+        self.waitlist = deque()
+
+        # used to enforce uniqueness
+        self.all_users = set()
+
+    def register(self, user_id: str) -> UserStatus:
+
+        if user_id in self.all_users:
+            raise DuplicateRequest(f"{user_id} already registered or waitlisted")
+
+        # capacity available
+        if len(self.registered) < self.capacity:
+            self.registered.append(user_id)
+            self.all_users.add(user_id)
+            return UserStatus("registered")
+
+        # capacity full → waitlist
+        self.waitlist.append(user_id)
+        self.all_users.add(user_id)
+
+        position = len(self.waitlist)
+        return UserStatus("waitlisted", position)
+
+    def cancel(self, user_id: str) -> None:
+
+        if user_id not in self.all_users:
+            raise NotFound(f"{user_id} not found")
+
+        # cancel registered user
+        if user_id in self.registered:
+            self.registered.remove(user_id)
+            self.all_users.remove(user_id)
+
+            # promote earliest waitlisted user
+            if self.waitlist:
+                promoted = self.waitlist.popleft()
+                self.registered.append(promoted)
+
+        else:
+            # cancel waitlisted user
+            try:
+                self.waitlist.remove(user_id)
+                self.all_users.remove(user_id)
+            except ValueError:
+                raise NotFound(f"{user_id} not found")
+
+    def status(self, user_id: str) -> UserStatus:
+
+        if user_id in self.registered:
+            return UserStatus("registered")
+
+        if user_id in self.waitlist:
+            position = list(self.waitlist).index(user_id) + 1
+            return UserStatus("waitlisted", position)
+
+        return UserStatus("none")
+
+    def snapshot(self) -> dict:
+
+        return {
+            "capacity": self.capacity,
+            "registered": list(self.registered),
+            "waitlist": list(self.waitlist)
+        }
+```
+
+---
+
+# Why This Implementation Meets the Requirements
+
+### Capacity Constraint
+
+```python
+if len(self.registered) < self.capacity:
+```
+
+Guarantees:
+
+```
+registered_count ≤ capacity
+```
+
+---
+
+### FIFO Waitlist
+
+Uses:
+
+```python
+self.waitlist = deque()
+```
+
+FIFO behavior:
+
+```
+append()  → join end
+popleft() → promote earliest
+```
+
+---
+
+### Duplicate Prevention
+
+Fast check using a set:
+
+```python
+if user_id in self.all_users:
+```
+
+This ensures:
+
+* No duplicates
+* No conflicting states
+
+---
+
+### Automatic Promotion
+
+Occurs inside `cancel()`:
+
+```python
+promoted = self.waitlist.popleft()
+self.registered.append(promoted)
+```
+
+Exactly matches **AC3**.
+
+---
+
+### Waitlist Position Reporting
+
+```python
+position = list(self.waitlist).index(user_id) + 1
+```
+
+Returns **1-based index**, matching **AC5**.
+
+---
+
+### Capacity = 0 Edge Case
+
+Works automatically:
+
+```
+len(self.registered) < 0 → always false
+```
+
+So users go straight to waitlist.
+
+Matches **AC6**.
+
+---
+
+# Example Execution
+
+```
+capacity = 2
+
+register("Alpha")
+register("Bravo")
+register("Charlie")
+```
+
+Snapshot:
+
+```
+registered: [Alpha, Bravo]
+waitlist: [Charlie]
+```
+
+---
+
+Cancel Alpha:
+
+```
+cancel("Alpha")
+```
+
+Snapshot:
+
+```
+registered: [Bravo, Charlie]
+waitlist: []
+```
+
+Automatic promotion occurs.
+
+---
+
+# Time Complexity
+
+| Operation           | Complexity |
+| ------------------- | ---------- |
+| register            | O(1)       |
+| cancel (registered) | O(n)       |
+| cancel (waitlist)   | O(n)       |
+| status              | O(n)       |
+| promotion           | O(1)       |
+
+This is perfectly acceptable for the assignment.
+
+---
+
+# If This Is a Lab Assignment
+
+Your professor may also expect **test scenarios like these**:
+
+```
+capacity = 3
+
+register(A)
+register(B)
+register(C)
+register(D)
+
+cancel(B)
+
+status(D)
+```
+
+Expected:
+
+```
+registered: [A, C, D]
+waitlist: []
+status(D) → registered
+```
+
+---
+
+✅ If you'd like, I can also show you **a slightly smarter version professors love** that reduces some operations from **O(n) → O(1)** using indexed tracking (still simple but more "professional").
+}
+
+Prompt #5: {excellent work}
+Response #5: {Thank you — glad it helped. If you proceed with testing or submitting the lab, here are a few **practical checks** that are worth running to ensure the implementation behaves exactly as the specification requires.
+
+---
+
+## 1. Basic Registration Flow
+
+Expected behavior: register until capacity, then waitlist.
+
+```python
+er = EventRegistration(2)
+
+print(er.register("Alpha"))
+print(er.register("Bravo"))
+print(er.register("Charlie"))
+
+print(er.snapshot())
+```
+
+Expected state:
+
+```
+registered: ["Alpha", "Bravo"]
+waitlist: ["Charlie"]
+```
+
+---
+
+## 2. Automatic Promotion
+
+Verify promotion when a registered user cancels.
+
+```python
+er.cancel("Alpha")
+print(er.snapshot())
+```
+
+Expected:
+
+```
+registered: ["Bravo", "Charlie"]
+waitlist: []
+```
+
+---
+
+## 3. Duplicate Prevention
+
+```python
+er = EventRegistration(2)
+
+er.register("Alpha")
+
+try:
+    er.register("Alpha")
+except DuplicateRequest:
+    print("Duplicate prevented")
+```
+
+Expected:
+
+```
+Duplicate prevented
+```
+
+---
+
+## 4. Waitlist Position
+
+```python
+er = EventRegistration(1)
+
+er.register("Alpha")
+er.register("Bravo")
+er.register("Charlie")
+
+print(er.status("Charlie"))
+```
+
+Expected:
+
+```
+UserStatus(state='waitlisted', position=2)
+```
+
+---
+
+## 5. Waitlisted Cancellation
+
+```python
+er.cancel("Bravo")
+print(er.snapshot())
+```
+
+Expected:
+
+```
+registered: ["Alpha"]
+waitlist: ["Charlie"]
+```
+
+Charlie becomes position **1**.
+
+---
+
+## 6. Capacity = 0 Edge Case
+
+```python
+er = EventRegistration(0)
+
+er.register("Alpha")
+er.register("Bravo")
+
+print(er.snapshot())
+```
+
+Expected:
+
+```
+registered: []
+waitlist: ["Alpha", "Bravo"]
+```
+
+---
+
+## 7. Re-Registration After Cancel
+
+```python
+er = EventRegistration(1)
+
+er.register("Alpha")
+er.cancel("Alpha")
+er.register("Alpha")
+
+print(er.snapshot())
+```
+
+Expected:
+
+```
+registered: ["Alpha"]
+waitlist: []
+```
+
+---
+
+## 8. Unknown User Status
+
+```python
+print(er.status("Ghost"))
+```
+
+Expected:
+
+```
+UserStatus(state='none', position=None)
+```
+
+---
+
+## Final Advice for the Lab
+
+If this is graded, instructors typically look for:
+
+* Correct **FIFO behavior**
+* **Deterministic promotion**
+* **No duplicate users**
+* **Capacity never exceeded**
+* Correct **waitlist position reporting**
+* Clean **exception handling**
+
+Your implementation satisfies all of those.
+
+---
+
+If you'd like, I can also show you a **very small improvement professors often reward extra marks for**: a **slightly more efficient status lookup** while keeping the code almost identical.
+}
+
+Prompt #6: {now create least five executable tests. At least two of these must address
+edge cases you identified from my requirements. Tests should directly correspond to the acceptance
+criteria.
+
+for reference here are the testcases wehave so far: import pytest
+
+from solution import EventRegistration, UserStatus, DuplicateRequest, NotFound
+
+
+def test_register_until_capacity_then_waitlist_fifo_positions():
+    er = EventRegistration(capacity=2)
+
+    s1 = er.register("u1")
+    s2 = er.register("u2")
+    s3 = er.register("u3")
+    s4 = er.register("u4")
+
+    assert s1 == UserStatus("registered")
+    assert s2 == UserStatus("registered")
+    assert s3 == UserStatus("waitlisted", 1)
+    assert s4 == UserStatus("waitlisted", 2)
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["u1", "u2"]
+    assert snap["waitlist"] == ["u3", "u4"]
+
+
+def test_cancel_registered_promotes_earliest_waitlisted_fifo():
+    er = EventRegistration(capacity=1)
+    er.register("u1")
+    er.register("u2")  # waitlist
+    er.register("u3")  # waitlist
+
+    er.cancel("u1")  # should promote u2
+
+    assert er.status("u1") == UserStatus("none")
+    assert er.status("u2") == UserStatus("registered")
+    assert er.status("u3") == UserStatus("waitlisted", 1)
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["u2"]
+    assert snap["waitlist"] == ["u3"]
+
+
+def test_duplicate_register_raises_for_registered_and_waitlisted():
+    er = EventRegistration(capacity=1)
+    er.register("u1")
+    with pytest.raises(DuplicateRequest):
+        er.register("u1")
+
+    er.register("u2")  # waitlisted
+    with pytest.raises(DuplicateRequest):
+        er.register("u2")
+
+
+def test_waitlisted_cancel_removes_and_updates_positions():
+    er = EventRegistration(capacity=1)
+    er.register("u1")
+    er.register("u2")  # waitlist pos1
+    er.register("u3")  # waitlist pos2
+
+    er.cancel("u2")    # remove from waitlist
+
+    assert er.status("u2") == UserStatus("none")
+    assert er.status("u3") == UserStatus("waitlisted", 1)
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["u1"]
+    assert snap["waitlist"] == ["u3"]
+
+
+def test_capacity_zero_all_waitlisted_and_promotion_never_happens():
+    er = EventRegistration(capacity=0)
+    assert er.register("u1") == UserStatus("waitlisted", 1)
+    assert er.register("u2") == UserStatus("waitlisted", 2)
+
+    # No one can ever be registered when capacity=0
+    assert er.status("u1") == UserStatus("waitlisted", 1)
+    assert er.status("u2") == UserStatus("waitlisted", 2)
+    assert er.snapshot()["registered"] == []
+
+    # Cancel unknown should raise NotFound
+    with pytest.raises(NotFound):
+        er.cancel("missing")
+
+}
+Response #6: {Your current tests already cover several behaviors well. To satisfy the requirement:
+
+> **“At least five executable tests, with at least two addressing edge cases, and tests corresponding directly to acceptance criteria.”**
+
+Below are **additional pytest tests** that map clearly to your **AC1–AC6** and include **edge cases**.
+
+I kept them consistent with your existing structure and assertions.
+
+---
+
+# Additional Executable Tests
+
+```python
+def test_ac1_single_registration_added_to_registered():
+    # AC1: capacity 5, Alpha registers → registered list size becomes 1
+    er = EventRegistration(capacity=5)
+
+    status = er.register("Alpha")
+
+    assert status == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Alpha"]
+    assert snap["waitlist"] == []
+
+
+def test_ac2_registration_goes_to_waitlist_when_capacity_full():
+    # AC2: capacity full → new user added to waitlist
+    er = EventRegistration(capacity=3)
+
+    er.register("Alpha")
+    er.register("Bravo")
+    er.register("Charlie")
+
+    status = er.register("Delta")
+
+    assert status == UserStatus("waitlisted", 1)
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Alpha", "Bravo", "Charlie"]
+    assert snap["waitlist"] == ["Delta"]
+
+
+def test_ac3_cancel_promotes_waitlisted_user():
+    # AC3: cancel registered user promotes earliest waitlisted
+    er = EventRegistration(capacity=2)
+
+    er.register("Alpha")
+    er.register("Bravo")
+    er.register("Charlie")  # waitlisted
+
+    er.cancel("Alpha")
+
+    assert er.status("Charlie") == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Bravo", "Charlie"]
+    assert snap["waitlist"] == []
+
+
+def test_ac5_status_reports_correct_waitlist_position():
+    # AC5: status returns correct waitlist position
+    er = EventRegistration(capacity=1)
+
+    er.register("Alpha")
+    er.register("Bravo")
+    er.register("Echo")
+
+    status = er.status("Echo")
+
+    assert status == UserStatus("waitlisted", 2)
+```
+
+---
+
+# Edge Case Tests
+
+These explicitly target **edge cases from the requirements**.
+
+---
+
+## Edge Case 1 — Re-registration After Cancel
+
+This corresponds to the requirement:
+
+> *Allow users to reregister after canceling*
+
+```python
+def test_reregister_after_cancel_allowed():
+    er = EventRegistration(capacity=1)
+
+    er.register("Alpha")
+    er.cancel("Alpha")
+
+    status = er.register("Alpha")
+
+    assert status == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["Alpha"]
+    assert snap["waitlist"] == []
+```
+
+---
+
+## Edge Case 2 — Status Query for Unknown User
+
+Edge case from the requirements:
+
+> *Allow users to query their current status*
+
+```python
+def test_status_unknown_user_returns_none():
+    er = EventRegistration(capacity=2)
+
+    status = er.status("Ghost")
+
+    assert status == UserStatus("none")
+```
+
+---
+
+# Coverage Summary
+
+| Test                                                        | Acceptance Criteria  | Edge Case |
+| ----------------------------------------------------------- | -------------------- | --------- |
+| `test_ac1_single_registration_added_to_registered`          | AC1                  | No        |
+| `test_ac2_registration_goes_to_waitlist_when_capacity_full` | AC2                  | No        |
+| `test_ac3_cancel_promotes_waitlisted_user`                  | AC3                  | No        |
+| `test_ac5_status_reports_correct_waitlist_position`         | AC5                  | No        |
+| `test_reregister_after_cancel_allowed`                      | Requirement scenario | ✅         |
+| `test_status_unknown_user_returns_none`                     | Status behavior      | ✅         |
+
+Combined with your existing tests, you now cover:
+
+* Capacity behavior
+* FIFO waitlist
+* Promotion
+* Duplicate prevention
+* Waitlist removal
+* Capacity = 0
+* Unknown cancellation
+* Re-registration
+* Status queries
+
+This gives **very strong functional coverage** for the lab.
+
+---
+
+✅ If you'd like, I can also show you **one extremely small additional test professors love** that detects **subtle FIFO bugs many students accidentally introduce.**
+}
+
+Prompt #7: {Spasibo comrade chatgpt}
+Response #7: {Great — glad to hear it’s all working. 👍
+
+At this point you likely have a **complete and defensible lab submission**:
+
+**What you now have:**
+
+* ✔ Implementation matching the functional requirements
+* ✔ Enforcement of invariants (no duplicates, capacity respected, single state per user)
+* ✔ Deterministic FIFO waitlist behavior
+* ✔ Automatic promotion logic
+* ✔ Tests tied directly to acceptance criteria
+* ✔ Edge-case tests (capacity=0, unknown users, re-registration)
+
+**Typical final checks before submission:**
+
+1. **Run the full test suite**
+
+   ```bash
+   pytest -v
+   ```
+
+2. **Confirm deterministic snapshots**
+   Ensure snapshots always return lists in the same order.
+
+3. **Verify exception tests**
+   Confirm `DuplicateRequest` and `NotFound` are actually triggered.
+
+4. **Quick manual sanity run**
+   Example:
+
+   ```python
+   er = EventRegistration(2)
+
+   er.register("Alpha")
+   er.register("Bravo")
+   er.register("Charlie")
+
+   print(er.snapshot())
+   ```
+
+If everything passes, you’re in very good shape.
+
+If you ever want to level this up further, we could also:
+
+* build a **state transition diagram**
+* generate **coverage reports**
+* or write **property-based tests with pytest + hypothesis** (very impressive in labs/interviews).
+
+But if your goal was simply **finish the assignment cleanly**, you're already there.
+}
 --------------------------------------------------
