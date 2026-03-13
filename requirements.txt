@@ -1,0 +1,161 @@
+System purpose: The system automates the management of daily routines through reminders, event registrations and waitlist handling to reduce mental effort and ensure reliability
+
+Inputs to the system:
+- User added reminders
+- Event registrations and waitlist entries
+- Times, dates, and repeat settings
+- User changes
+- Current date and time
+- Existing scheduled items
+- Waitlist or queue updates
+- Notification preferences
+
+Outputs produced by the system:
+- Scheduled reminders and notifications
+- Ordered daily/weekly view or list
+- Automatic conflict resolutions
+- Explanations for changes
+- Confirmation & status updates
+- Snooze/reschedule/cancel notifications
+- Waitlist status & promotions
+- No duplicate alerts
+
+Primary goal of the system: Provide reliable automation with predictable behavior for primary users like Jane, while delivering outcomes, clear explanations for changes, and no silent failures for edge users like Mo to reduce uncertainty and stress.
+
+Assumptions
+A1: The system is accessed via a mobile or web application that supports push, email, and/or SMS notifications
+A2: Accurate current date and time are always available to the system
+A3: Event registrations and waitlists are processed by a reliable backend that handles joins, cancellations, and promotions consistently
+A4: Users enter valid future-oriented dates/times for reminders and registrations; invalid inputs receive immediate error feedback
+A5: Each user has a unique account identifier used for waitlist ordering and personalization
+A6: Reminder and registration data are stored persistently and retrievable for conflict detection, ordering, and explanation generation
+
+Functional Requirements
+FR1: The system shall automatically detect and resolve time-based conflicts without requiring user intervention.
+FR2: The system shall enforce predictable and stable ordering of reminders and scheduled items in all identical or similar situations
+FR3: The system shall minimize notification volume by suppressing duplicates and nonessential alerts
+FR4: The system shall provide clear, concise explanations whenever it automatically modifies, skips, reorders, or promotes items
+FR5: The system shall provide visible success/failure feedback for every user action and avoid silent failures
+FR6: The system shall notify users of waitlist promotions and allow viewing of current waitlist status
+
+System Constraints - Constraints are conditions the system must always respect.
+C1: Derived from persona attribute (Jane): “Acts quickly and rarely revisits system suggestions” (Behavior)
+     > The system must minimize user prompts and manual interventions by automating conflict resolution and presenting only essential outputs.
+
+C2: Derived from persona attribute (Jane): “Prefers concise outputs and minimal interaction when making decisions” (Need)
+     > The system must limit notifications, suppress duplicates, and use brief feedback to prevent cognitive overload.
+
+C3: Derived from persona attribute (Jane): “Trusts the system to resolve conflicts and enforce rules automatically” (Behavior/Need)
+     > The system must handle routine conflicts, overlaps, and promotions silently without requiring confirmation.
+
+C4: Derived from persona attribute (Mo): “Experiences stress when outcomes appear arbitrary or unexplained” (Pain Point)
+     > The system must enforce deterministic behavior and never produce inconsistent results in repeated scenarios.
+
+C5: Derived from persona attribute (Mo): “Carefully reviews outputs and seeks explanations for system decisions” (Behavior/Need)
+     > The system must provide explicit explanations for any non-obvious automated change.
+
+C6: Derived from persona attribute (Mo): “Not understanding why the system changed or rejected an action; silent failures or dropped reminders/requests” (Pain Point)
+     > The system must avoid silent failures and ensure visible feedback for all actions and changes.
+
+Acceptance Criteria - Acceptance criteria define how system behavior will be verified.
+AC1:
+Given two reminders scheduled at the exact same time,
+When the daily schedule is generated or viewed,
+Then the reminders are ordered consistently according to a fixed deterministic rule and the order never changes unless explicitly edited by the user.
+Linked Constraint ID(s): C4
+
+AC2:
+Given a new registration overlaps with an existing reminder,
+When the conflict is processed,
+Then the system automatically adjusts the schedule silently without prompting the user and without sending unnecessary notifications.
+Linked Constraint ID(s): C1, C3
+
+AC3:
+Given multiple notifications for the same item become eligible in a short time,
+When notifications are delivered,
+Then duplicates are suppressed and only one relevant notification is sent.
+Linked Constraint ID(s): C2
+
+AC4:
+Given the user snoozes or cancels a reminder/registration,
+When the action completes,
+Then the system immediately shows a clear confirmation message with no silent processing.
+Linked Constraint ID(s): C6
+
+AC5:
+Given the system automatically moves or skips a reminder due to a conflict,
+When the user views the affected item,
+Then a concise explanation in plain language is displayed.
+Linked Constraint ID(s): C5
+
+AC6:
+Given a user is promoted from a waitlist to confirmed registration,
+When the promotion occurs,
+Then exactly one promotion notification is sent and the status updates visibly without silent changes.
+Linked Constraint ID(s): C3, C6
+
+Edge Cases - Describe unusual or boundary situations the system must handle.
+EC1: Two or more reminders share the exact same timestamp.
+     Expected system behavior: Reminders are ordered using a fixed rule and the order remains identical on every view or refresh.
+
+EC2: User snoozes a reminder into an existing exact-time collision with another reminder.
+     Expected system behavior: The user-moved reminder is placed after existing items at that time, then alphabetical ordering applied if needed; visible confirmation is shown.
+
+EC3: Waitlist promotion occurs while the user is offline, has notifications disabled, or is in quiet hours.
+     Expected system behavior: The promotion is queued, delivered upon next app open or quiet hours end, status is updated, and explanation is available if viewed.
+
+Traceability - Link functional requirements to constraints and acceptance criteria.
+FR > C > AC mapping
+FR1 > C1, C3 > AC2
+FR2 > C4 > AC1
+FR3 > C2 > AC3
+FR4 > C5 > AC5
+FR5 > C6 > AC4
+FR6 > C3, C6 > AC6
+
+Revision Notes
+---------------------------------
+Requirement amendments:
+C7 (Deterministic Resolution Constraint): For identical inputs, timestamps, and system state, conflict resolution outcomes shall always be identical regardless of execution time, device, or session.
+C8 (Canonical Time Source Constraint): The system shall evaluate scheduling, ordering, and conflicts using a single canonical server time reference independent of client device time.
+C9 (Atomic State Update Constraint): All reminder, registration, and waitlist state changes shall be applied atomically so that partial updates cannot be observed by users.
+AC2: additional information: Conflicts are resolved using priority order: Confirmed event registrations, User-edited reminders, System-generated reminders, Earliest movable item shifts forward to nearest free slot.
+EC4:User edits reminder multiple times within seconds.
+Risk: Race conditions → inconsistent ordering. Expected Behavior: Latest confirmed action supersedes prior pending updates.
+EC5: User cancels while promotion occurs.
+Expected Behavior: Promotion validity checked against latest state; cancelled users are skipped deterministically.
+EC6: User snoozes reminder offline.
+Expected Behavior: Action queued locally, visibly marked “pending sync,” reconciled deterministically on reconnect.
+EC7: Many reminders added simultaneously Risk: Ordering instability.
+Expected Behavior: System applies deterministic batch ordering before conflict resolution.
+EC8: User disables notifications after promotion queued.
+Expected Behavior: Queued notification follows preference state at delivery time but remains visible in app.
+
+Revision Note 1
+Requirement added: C7 (Deterministic Resolution Constraint)
+Reason: No constraint makes sure that "the same inputs always produce the same adjustment outcome ties should be resolved"
+Action: Added new Constraint
+
+Revision Note 2
+Requirement added: C8 (Canonical Time Source Constraint)
+Reason: There are not much constraints handling "timezone changes, daylight saving, server device time mismatch"
+Action: Added new Constraint
+
+Revision Note 3
+Requirement added: C9 (Atomic State Update Constraint)
+Reason: A6 mentions storage but no constraint prevents partial writes or lost updates
+Action: Added new Constraint
+
+Revision Note 4
+Requirement modified: AC2
+Reason: “Automatically adjusts the schedule” is too vague
+Action: added the info "Conflicts are resolved using priority order: Confirmed event registrations, User-edited reminders, System-generated reminders, Earliest movable item shifts forward to nearest free slot."
+
+Revision Note 5
+Reason: Ambiguity of what qualifies as nonessential
+Action: Nothing
+
+Revision Note 6
+Edge case added: EC4, EC5, EC6, EC7, EC8
+Reason: Edge Cases were lacking certain scenarios
+Action: New Edge Cases added

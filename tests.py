@@ -164,3 +164,122 @@ def test_status_unknown_user_returns_none():
     status = er.status("Ghost")
 
     assert status == UserStatus("none")
+
+# -----------------------------
+# Core Functionality Tests
+# -----------------------------
+
+def test_register_until_capacity():
+    event = EventRegistration(capacity=2)
+
+    event.register("alice")
+    event.register("bob")
+
+    snapshot = event.snapshot()
+
+    assert snapshot["registered"] == ["alice", "bob"]
+    assert snapshot["waitlist"] == []
+    assert len(snapshot["registered"]) <= event.capacity
+
+
+def test_waitlist_after_capacity_reached():
+    event = EventRegistration(capacity=1)
+
+    event.register("alice")
+    status = event.register("bob")
+
+    snapshot = event.snapshot()
+
+    assert snapshot["registered"] == ["alice"]
+    assert snapshot["waitlist"] == ["bob"]
+    assert status.state == "waitlisted"
+    assert status.position == 1
+
+
+def test_fifo_waitlist_promotion():
+    event = EventRegistration(capacity=1)
+
+    event.register("alice")
+    event.register("bob")
+    event.register("carol")
+
+    event.cancel("alice")
+
+    snapshot = event.snapshot()
+
+    assert snapshot["registered"] == ["bob"]
+    assert snapshot["waitlist"] == ["carol"]
+
+
+def test_prevent_duplicate_registration():
+    event = EventRegistration(capacity=2)
+
+    event.register("alice")
+
+    with pytest.raises(DuplicateRequest):
+        event.register("alice")
+
+
+def test_status_queries():
+    event = EventRegistration(capacity=1)
+
+    event.register("alice")
+    event.register("bob")
+
+    assert event.status("alice").state == "registered"
+    assert event.status("bob").state == "waitlisted"
+    assert event.status("bob").position == 1
+    assert event.status("unknown").state == "none"
+
+
+# -----------------------------
+# Edge Case Tests
+# -----------------------------
+
+def test_capacity_zero_all_waitlisted():
+    """Edge Case: Capacity = 0"""
+    event = EventRegistration(capacity=0)
+
+    s1 = event.register("alice")
+    s2 = event.register("bob")
+
+    snapshot = event.snapshot()
+
+    assert snapshot["registered"] == []
+    assert snapshot["waitlist"] == ["alice", "bob"]
+    assert s1.state == "waitlisted"
+    assert s2.state == "waitlisted"
+
+
+def test_waitlisted_user_cancels_before_promotion():
+    """Edge Case: Waitlisted user cancels before promotion"""
+    event = EventRegistration(capacity=1)
+
+    event.register("alice")
+    event.register("bob")
+    event.register("carol")
+
+    event.cancel("bob")
+
+    snapshot = event.snapshot()
+
+    assert snapshot["registered"] == ["alice"]
+    assert snapshot["waitlist"] == ["carol"]
+
+
+def test_multiple_cancellations_promote_in_order():
+    """Edge Case: Multiple cancellations in sequence"""
+    event = EventRegistration(capacity=2)
+
+    event.register("alice")
+    event.register("bob")
+    event.register("carol")
+    event.register("dave")
+
+    event.cancel("alice")
+    event.cancel("bob")
+
+    snapshot = event.snapshot()
+
+    assert snapshot["registered"] == ["carol", "dave"]
+    assert snapshot["waitlist"] == []

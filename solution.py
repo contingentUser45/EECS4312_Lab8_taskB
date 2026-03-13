@@ -3,8 +3,8 @@
 
 """
 Task B: Event Registration with Waitlist (Stub)
-In this lab, you will design and implement an Event Registration with Waitlist system using an LLM assistant as your primary programming collaborator. 
-You are asked to implement a Python module that manages registration for a single event with a fixed capacity. 
+In this lab, you will design and implement an Event Registration with Waitlist system using an LLM assistant as your primary programming collaborator.
+You are asked to implement a Python module that manages registration for a single event with a fixed capacity.
 The system must:
 •	Accept a fixed capacity.
 •	Register users until capacity is reached.
@@ -33,10 +33,10 @@ The system must correctly handle non-trivial scenarios such as:
 
 The output consists of the updated registration state and ordered lists of registered and waitlisted users after each operation.
 """
-
 from dataclasses import dataclass
 from typing import List, Optional
 from collections import deque
+import threading
 
 
 class DuplicateRequest(Exception):
@@ -65,65 +65,85 @@ class EventRegistration:
         self.registered: List[str] = []
         self.waitlist = deque()
 
-        # used to enforce uniqueness
+        # enforce uniqueness across states
         self.all_users = set()
 
+        # ensures atomic state updates (C9)
+        self._lock = threading.Lock()
+
+    def _promote_if_possible(self) -> Optional[str]:
+        """
+        Deterministic FIFO promotion (AC6, EC1, EC7)
+        """
+        if self.waitlist and len(self.registered) < self.capacity:
+            promoted = self.waitlist.popleft()
+            self.registered.append(promoted)
+            return promoted
+        return None
+
     def register(self, user_id: str) -> UserStatus:
+        with self._lock:
 
-        if user_id in self.all_users:
-            raise DuplicateRequest(f"{user_id} already registered or waitlisted")
+            if user_id in self.all_users:
+                raise DuplicateRequest(f"{user_id} already registered or waitlisted")
 
-        # capacity available
-        if len(self.registered) < self.capacity:
-            self.registered.append(user_id)
+            # register directly if capacity available
+            if len(self.registered) < self.capacity:
+                self.registered.append(user_id)
+                self.all_users.add(user_id)
+                return UserStatus("registered")
+
+            # otherwise join FIFO waitlist
+            self.waitlist.append(user_id)
             self.all_users.add(user_id)
-            return UserStatus("registered")
 
-        # capacity full → waitlist
-        self.waitlist.append(user_id)
-        self.all_users.add(user_id)
-
-        position = len(self.waitlist)
-        return UserStatus("waitlisted", position)
-
-    def cancel(self, user_id: str) -> None:
-
-        if user_id not in self.all_users:
-            raise NotFound(f"{user_id} not found")
-
-        # cancel registered user
-        if user_id in self.registered:
-            self.registered.remove(user_id)
-            self.all_users.remove(user_id)
-
-            # promote earliest waitlisted user
-            if self.waitlist:
-                promoted = self.waitlist.popleft()
-                self.registered.append(promoted)
-
-        else:
-            # cancel waitlisted user
-            try:
-                self.waitlist.remove(user_id)
-                self.all_users.remove(user_id)
-            except ValueError:
-                raise NotFound(f"{user_id} not found")
-
-    def status(self, user_id: str) -> UserStatus:
-
-        if user_id in self.registered:
-            return UserStatus("registered")
-
-        if user_id in self.waitlist:
-            position = list(self.waitlist).index(user_id) + 1
+            position = len(self.waitlist)
             return UserStatus("waitlisted", position)
 
-        return UserStatus("none")
+    def cancel(self, user_id: str) -> None:
+        with self._lock:
+
+            if user_id not in self.all_users:
+                raise NotFound(f"{user_id} not found")
+
+            # cancel registered user
+            if user_id in self.registered:
+                self.registered.remove(user_id)
+                self.all_users.remove(user_id)
+
+                # deterministic promotion
+                promoted = self._promote_if_possible()
+                if promoted:
+                    # promoted user already tracked in all_users
+                    pass
+
+            else:
+                # cancel waitlisted user
+                try:
+                    self.waitlist.remove(user_id)
+                    self.all_users.remove(user_id)
+                except ValueError:
+                    raise NotFound(f"{user_id} not found")
+
+    def status(self, user_id: str) -> UserStatus:
+        with self._lock:
+
+            if user_id in self.registered:
+                return UserStatus("registered")
+
+            if user_id in self.waitlist:
+                position = list(self.waitlist).index(user_id) + 1
+                return UserStatus("waitlisted", position)
+
+            return UserStatus("none")
 
     def snapshot(self) -> dict:
-
-        return {
-            "capacity": self.capacity,
-            "registered": list(self.registered),
-            "waitlist": list(self.waitlist)
-        }
+        """
+        Provides deterministic ordered system state (AC1, EC1).
+        """
+        with self._lock:
+            return {
+                "capacity": self.capacity,
+                "registered": list(self.registered),
+                "waitlist": list(self.waitlist)
+            }
