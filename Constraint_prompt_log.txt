@@ -1,0 +1,1 @@
+No LLM was used to creat the constraints itself, other than to fix the formatting of the table due to some weird glitch that prevents attaching images
